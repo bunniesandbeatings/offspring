@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"bytes"
 )
 
 type ExtractOptions struct {
@@ -51,7 +52,7 @@ func (extractOptions *ExtractOptions) Execute(args []string) error {
 
 	matches := pattern.FindAllSubmatch(state, -1)
 
-	templateString := []byte("{{" + extractOptions.Key + "}}")
+	template := []byte("{{" + extractOptions.Key + "}}")
 
 	var newState string
 
@@ -69,16 +70,15 @@ func (extractOptions *ExtractOptions) Execute(args []string) error {
 				return nil
 			}
 
-			groupKiller, _ := regexp.Compile(regexp.QuoteMeta(string(matches[0][1])))
-
-			newState = string(groupKiller.ReplaceAll(state, templateString))  // TODO this is really bad, duplicates will be found and replaced with the same variable.
-			// It's about now I wish I had written tests so another human could read this :/
+			newState = string(pattern.ReplaceAllFunc(state, func(match []byte) []byte {
+				return bytes.Replace(match, matches[0][1], template, 1)
+			}))
 		} else {
 			if (globalOptions.Debug) {
 				fmt.Printf("Whole expression match:\n\n%s",string(matches[0][0]))
 				return nil
 			}
-			newState = string(pattern.ReplaceAll(state, templateString))
+			newState = string(pattern.ReplaceAll(state, template))
 		}
 	}
 

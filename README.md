@@ -8,7 +8,13 @@ and so might you.
 I use 2FA, specifically LastPass. But given any source of configuration, which you want to manage, and credentials,
 which you want to store, how do you merge and split the two easily?
 
-# Paths for injection: 
+# All pipes
+
+You can specify the input file if you must, but this tool is designed to:
+  * pipe a state-file through a set of `inject` or `extract` commands.
+  * use temprorary pipes `<()` `>()` to avoid putting credentials on disk
+
+# Injection: 
 
 ## Path: I have the credentials
 
@@ -22,26 +28,26 @@ Given:
   
 Output:
 
-  * finalized state-file
+  * finalized state-file content on stdout.
+  * User uses redirection to commit state, or pipes to process further
 
 ## Path: I do not have the credentials or state file 
 
 If I do not have either the creds or the state file (or the state-file is somewhat empty), I still want to act like I
 have the state-file when I update a resource.
 
-1. Input file does not match moustache, then just output the input file.
-2. If the Input file does match the moustache, but no creds, error out.
-3. If there is not input or input file, do not create output or output file
-
+  * Input file does not match moustache, then just output the input file.
 
 ## Usage
 
 ```
-offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing
+offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
+```
 
-and 
-
-cat test/state-file.thing | offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing
+and
+ 
+```
+cat test/state-file.thing | offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
 ```
 
 # Extraction
@@ -58,46 +64,103 @@ Output:
   * credential as stdout or file
   * error if could not match, or match empty
 
+## Usage
+
+```
+offspring-state extract -k the-credential -f some-creds.file \
+  -p $'(?s)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\'' \
+  > outfile.txt
+```
+
+Again stdin also works.
 
 ## Regex Hints
-Working with regex is a pain, but the only good way I could come up with for ensuring the right captures. 
-Luckily `offspring-state` tool is designed to chain, making testing your regex's a little simpler.
+Working with regex is a pain, but it's the only reliable way I could find for ensuring the accurate captures. 
+Luckily the `offspring-state` tool is designed to chain, making testing your regex's a little simpler.
 
 It's important to learn about setting flags in [golang regular expressions](https://golang.org/pkg/regexp/syntax/).
 Most keys are multiline, so this pattern is your friend:
+
+`(?s)match-me:.*?'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)'`
+
+**Remember**:
+
+  * Single-quotes around multiline credentials make YAML deal with them without needing indentation.
+  * Single-quotes are a pain on the command line, but in bash `$''` is a great workaround.
+  * Capture enough to be certain you got the credential you wanted.
+  * Use `(?s)`, causing `.` to consume newlines.
+  * Use `.*?` to negate greediness because of `(?s)`.
+
+**Full Example**: 
 
 ```
 cat test/state-file.thing | \
 offspring-state inject -k the-credentials -f test/cred | \
 offspring-state extract -k the-credential \
-  -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
+  -p $'(?s)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
 ```
 
-Also note the `?` greedy negation
+# Testing:
 
-Lastly, dealing with single quoted strings for your regex:
+  Currently the only test is install:
+  
+  ```
+  go install .
+  ```
+  
+  Ensure interpolation (two identical keys with newline before closing quote):
 
-```
-echo $'It\'s Shell Programming'  # ksh, bash, and zsh only, does not expand variables
-echo "It's Shell Programming"   # all shells, expands variables
-echo 'It'\''s Shell Programming' # all shells, single quote is outside the quotes
-echo 'It'"'"'s Shell Programming' # all shells, single quote is inside double quotes
-```
-
+  ```
+  I am a strange
+  Kind of state file
+  match-me: '-----BEGIN RSA PRIVATE KEY-----
+  MIIEowIBAAKCAQEA1LLN4YbjcNE4cf9OpFERq+xUd3CAiIrzlAH7u/lLMoU2Ssko
+  ... snip ...
+  N5/jRa/s4Eq9FFxGnCPMy1tLcsifj4mJzxUMN/efNKvxH9BMdLjI
+  -----END RSA PRIVATE KEY-----
+  '
+  no-match: '-----BEGIN RSA PRIVATE KEY-----
+  MIIEowIBAAKCAQEA1LLN4YbjcNE4cf9OpFERq+xUd3CAiIrzlAH7u/lLMoU2Ssko
+  ... snip ...
+  N5/jRa/s4Eq9FFxGnCPMy1tLcsifj4mJzxUMN/efNKvxH9BMdLjI
+  -----END RSA PRIVATE KEY-----
+  '
+  ```
+  
+  Ensure reversability (only one key file is replaced with the template variable)
+  
+  ```
+  go install .; cat test/state-file.thing | \
+    offspring-state inject -k the-credentials -f test/cred | \
+    offspring-state extract -k the-credentials \
+      -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
+  I am a strange
+  Kind of state file
+  match-me: '{{the-credentials}}'
+  no-match: '-----BEGIN RSA PRIVATE KEY-----
+  MIIEowIBAAKCAQEA1LLN4YbjcNE4cf9OpFERq+xUd3CAiIrzlAH7u/lLMoU2Ssko
+  ... snip ...
+  N5/jRa/s4Eq9FFxGnCPMy1tLcsifj4mJzxUMN/efNKvxH9BMdLjI
+  -----END RSA PRIVATE KEY-----
+  '
+  ```
+  
+  There should be NO diff:
+  
+  ```
+  go install .; cat test/state-file.thing | \
+    offspring-state inject -k the-credentials -f test/cred | \
+    offspring-state extract -k the-credentials \
+      -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\'' | \
+      diff - test/state-file.thing
+  ```
+  
+  Try messing up the regex, you should see the diff.
+  
 # TODOs
-
-  * biggest bug:
   
-  ```
-  go install .; cat test/state-file.thing | offspring-state inject -k the-credentials -f test/cred | offspring-state extract -k the-credentials -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
-  ```
-  
-  currently replaces both creds because they look the same. I need an RE method that lets me replace a capture group.
-
   * try using <() for credential input
   * try using >() for credential output
-  * support overriding input state-file
-  * support writing to an alternate state-file
 
 
 
