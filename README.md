@@ -85,6 +85,15 @@ echo 'It'"'"'s Shell Programming' # all shells, single quote is inside double qu
 ```
 
 # TODOs
+
+  * biggest bug:
+  
+  ```
+  go install .; cat test/state-file.thing | offspring-state inject -k the-credentials -f test/cred | offspring-state extract -k the-credentials -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
+  ```
+  
+  currently replaces both creds because they look the same. I need an RE method that lets me replace a capture group.
+
   * try using <() for credential input
   * try using >() for credential output
   * support overriding input state-file

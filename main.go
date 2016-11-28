@@ -6,6 +6,7 @@ import (
 )
 
 type Options struct {
+	Debug bool `short:"v" long:"verbose" description:"Debug mode, great for killer regexes" `
 }
 
 var globalOptions Options
