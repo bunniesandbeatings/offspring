@@ -163,5 +163,3 @@ offspring-state extract -k the-credential \
   * try using >() for credential output
 
 
-
-

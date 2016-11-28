@@ -11,10 +11,13 @@ import (
 
 type ExtractOptions struct {
 	StateFile string `short:"s" long:"state-file" description:"The state file. Defaults to STDIN"`
+	CredentialFile string `short:"f" long:"credential-file" description:"the credential file to create or update with the new creds" required:"true"`
 
 	Key string `short:"k" long:"key" description:"the moustache name for the credential placeholder" required:"true"`
 
 	Pattern string `short:"p" long:"pattern" description:"The regular expression to find and extract the credentials (first capture group or entire expression)" required:"true"`
+
+	Multi bool `short:"m" long:"multi" description:"Replace multiple entries that match the capture group (will NOT work without capture group)"`
 }
 
 var extractOptions ExtractOptions
@@ -55,6 +58,7 @@ func (extractOptions *ExtractOptions) Execute(args []string) error {
 	template := []byte("{{" + extractOptions.Key + "}}")
 
 	var newState string
+	var cred []byte
 
 	if (len(matches) < 1) {
 		return errors.New(fmt.Sprintf("Could not match pattern '%s' in the state-file", extractOptions.Pattern))
@@ -65,21 +69,39 @@ func (extractOptions *ExtractOptions) Execute(args []string) error {
 		if (len(matches[0]) > 2) {
 			return errors.New(fmt.Sprintf("Matched capture group %d times(s) in the state-file, cannot have more than one sub group match", len(matches[0])))
 		} else if (len(matches[0]) > 1) {
+			cred = matches[0][1]
+
 			if (globalOptions.Debug) {
-				fmt.Printf("Capture group match:\n\n%s",string(matches[0][1]))
+				fmt.Printf("Capture group match:\n\n%s",string(cred))
 				return nil
 			}
 
-			newState = string(pattern.ReplaceAllFunc(state, func(match []byte) []byte {
-				return bytes.Replace(match, matches[0][1], template, 1)
-			}))
+			if (extractOptions.Multi) {
+				groupKiller, _ := regexp.Compile(regexp.QuoteMeta(string(matches[0][1])))
+				newState = string(groupKiller.ReplaceAll(state, template))
+			} else {
+				newState = string(pattern.ReplaceAllFunc(state, func(match []byte) []byte {
+					return bytes.Replace(match, cred, template, 1)
+				}))
+			}
 		} else {
+			if (extractOptions.Multi) {
+				return errors.New("Multi is on, but no capture groups matched")
+			}
+
+			cred = matches[0][0]
 			if (globalOptions.Debug) {
-				fmt.Printf("Whole expression match:\n\n%s",string(matches[0][0]))
+				fmt.Printf("Whole expression match:\n\n%s",string(cred))
 				return nil
 			}
 			newState = string(pattern.ReplaceAll(state, template))
 		}
+
+		credentialFileError := ioutil.WriteFile(extractOptions.CredentialFile ,cred, 0644)
+		if (credentialFileError != nil) {
+			return errors.New(fmt.Sprintf("Could not write to credentials file '%s'", extractOptions.CredentialFile))
+		}
+
 	}
 
 	fmt.Print(newState)

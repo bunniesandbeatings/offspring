@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"errors"
 	"io/ioutil"
-	"github.com/hoisie/mustache"
 	"os"
+	"regexp"
 )
 
 type InjectOptions struct {
@@ -63,7 +63,10 @@ func (injectOptions *InjectOptions) Execute(args []string) error {
 
 
 	// TODO: error out if template is not present
-	newState := mustache.Render(string(state), map[string]string{injectOptions.Key: string(credentials)})
+
+	handlebar, _ := regexp.Compile(regexp.QuoteMeta("{{" + injectOptions.Key + "}}"))
+
+	newState := handlebar.ReplaceAll(state, credentials)
 
 	fmt.Print(newState)
 
