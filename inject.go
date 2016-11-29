@@ -66,7 +66,7 @@ func (injectOptions *InjectOptions) Execute(args []string) error {
 
 	handlebar, _ := regexp.Compile(regexp.QuoteMeta("{{" + injectOptions.Key + "}}"))
 
-	newState := handlebar.ReplaceAll(state, credentials)
+	newState := string(handlebar.ReplaceAll(state, credentials))
 
 	fmt.Print(newState)
 
