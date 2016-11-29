@@ -1,18 +1,28 @@
-# You gotta keep them separated
+# Offspring
+
+**You gotta keep 'em separated**
 
 Credentials and state. It's inevitable when you use Stack Forming tools like CloudFormation, Bosh, and Terraform, 
 that you will have some state you need to maintain. This state either wants you to provide credentials, or will
-helpfully create them for you. But, you don't want to store the credentials in GitHub, they share repo's by mistake,
-and so might you.
+helpfully create them for you. But, you don't want to store the credentials on Github where they might get shared
+by mistake.
 
-I use 2FA, specifically LastPass. But given any source of configuration, which you want to manage, and credentials,
-which you want to store, how do you merge and split the two easily?
+Given:
+  * A source or sources of configuration
+    * Which you want to version control, with say Git
+    * That contains sensitive information such as credentials
+  * A desire to store the sensitive information somewhere seperate and secure
+    * Lastpass with 2FA for example
+
+How do you merge and split the config easily?
+
+Answer: Offspring
 
 # All pipes
 
-You can specify the input file if you must, but this tool is designed to:
+You can specify input and output files if you must, but this tool is designed to:
   * pipe a state-file through a set of `inject` or `extract` commands.
-  * use temprorary pipes `<()` `>()` to avoid putting credentials on disk
+  * use temprorary pipes `<()` `>()` to avoid putting credentials on disk.
 
 # Injection: 
 
@@ -41,13 +51,13 @@ have the state-file when I update a resource.
 ## Usage
 
 ```
-offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
+offspring inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
 ```
 
 and
  
 ```
-cat test/state-file.thing | offspring-state inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
+cat test/state-file.thing | offspring inject -k the-credentials -f test/cred -s test/state-file.thing > outfile.txt
 ```
 
 # Extraction
@@ -67,7 +77,7 @@ Output:
 ## Usage
 
 ```
-offspring-state extract -k the-credential -f some-creds.file \
+offspring extract -k the-credential -f some-creds.file \
   -p $'(?s)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\'' \
   > outfile.txt
 ```
@@ -76,7 +86,7 @@ Again stdin also works.
 
 ## Regex Hints
 Working with regex is a pain, but it's the only reliable way I could find for ensuring the accurate captures. 
-Luckily the `offspring-state` tool is designed to chain, making testing your regex's a little simpler.
+Luckily the `offspring` tool is designed to chain, making testing your regex's a little simpler.
 
 It's important to learn about setting flags in [golang regular expressions](https://golang.org/pkg/regexp/syntax/).
 Most keys are multiline, so this pattern is your friend:
@@ -95,8 +105,8 @@ Most keys are multiline, so this pattern is your friend:
 
 ```
 cat test/state-file.thing | \
-offspring-state inject -k the-credentials -f test/cred | \
-offspring-state extract -k the-credential \
+offspring inject -k the-credentials -f test/cred | \
+offspring extract -k the-credential \
   -p $'(?s)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
 ```
 
@@ -131,8 +141,8 @@ offspring-state extract -k the-credential \
   
   ```
   go install .; cat test/state-file.thing | \
-    offspring-state inject -k the-credentials -f test/cred | \
-    offspring-state extract -k the-credentials \
+    offspring inject -k the-credentials -f test/cred | \
+    offspring extract -k the-credentials \
       -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\''
   I am a strange
   Kind of state file
@@ -149,8 +159,8 @@ offspring-state extract -k the-credential \
   
   ```
   go install .; cat test/state-file.thing | \
-    offspring-state inject -k the-credentials -f test/cred | \
-    offspring-state extract -k the-credentials \
+    offspring inject -k the-credentials -f test/cred | \
+    offspring extract -k the-credentials \
       -p $'(?sm)match-me:.*?\'(-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----.*?)\'' | \
       diff - test/state-file.thing
   ```
