@@ -5,6 +5,7 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gexec"
 	. "github.com/onsi/gomega/gbytes"
+	. "github.com/bunniesandbeatings/commando/runner"
 )
 
 
