@@ -5,35 +5,40 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gexec"
 	. "github.com/onsi/gomega/gbytes"
-	. "github.com/bunniesandbeatings/commando/runner"
+	. "github.com/bunniesandbeatings/commandgo/runner"
 )
-
 
 var _ = Describe("inject command", func() {
 
 	var runner *Runner
 
 	BeforeEach(func() {
-		runner = NewRunner(offspringCLI,"inject")
+		runner = NewRunner(offspringCLI, "inject")
 	})
 
 	Describe("Statefile as a pipe", func() {
-		Describe("Passing in credentials as an argument", func() {
-		  BeforeEach(func() {
+		Context("Passing in credentials as an argument", func() {
+			BeforeEach(func() {
 				runner.AddArguments("-c", "VeryObscurePassword")
 			})
 
-			It("adds the credential to the output", func() {
-				command, stdin := runner.PipeCommand("-k", "sensitive-password")
+			Context("Passing in valid credential key", func() {
+				BeforeEach(func() {
+					runner.AddArguments("-k", "sensitive-password")
+				})
 
-				session, err := Start(command, GinkgoWriter, GinkgoWriter)
-				Expect(err).ToNot(HaveOccurred())
+				It("adds the credential to the output", func() {
+					command, stdin := runner.PipeCommand()
 
-				stdin.Write([]byte("this is a {{sensitive-password}}"))
-				stdin.Close()
+					session, err := Start(command, GinkgoWriter, GinkgoWriter)
+					Expect(err).ToNot(HaveOccurred())
 
-				Eventually(session).Should(Say("this is a VeryObscurePassword"))
-				Eventually(session).Should(Exit(0))
+					stdin.Write([]byte("this is a {{sensitive-password}}"))
+					stdin.Close()
+
+					Eventually(session).Should(Say("this is a VeryObscurePassword"))
+					Eventually(session).Should(Exit(0))
+				})
 			})
 
 		})
