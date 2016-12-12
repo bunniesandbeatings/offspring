@@ -2,6 +2,14 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/MakeNowJust/heredoc",
+			"repository": "https://github.com/MakeNowJust/heredoc",
+			"vcs": "git",
+			"revision": "1d91351acdc1cb2f2c995864674b754134b86ca7",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/jessevdk/go-flags",
 			"repository": "https://github.com/jessevdk/go-flags",
 			"vcs": "git",
