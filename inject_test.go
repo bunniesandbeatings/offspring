@@ -9,10 +9,10 @@ import (
 )
 
 var _ = Describe("inject command", func() {
-	var runner *Runner
+	var runner *ExecutableContext
 
 	BeforeEach(func() {
-		runner = NewRunner(offspringCLI, "inject")
+		runner = NewExecutableContext(offspringCLI, "inject")
 	})
 
 	Describe("Statefile as a pipe", func() {

@@ -19,13 +19,15 @@ type Extraction struct {
 	Name    string
 	Pattern *regexp.Regexp // perhaps an re
 	Multi   bool
+	LeftTash string
+	RightTash string
 }
 
 type Extractor interface {
 	Execute(source []byte) ([]byte, string, error)
 }
 
-func NewConfiguration(name string, pattern string, allowMultiple bool) (*Extraction, error) {
+func NewConfiguration(name string, pattern string) (*Extraction, error) {
 		patternExpression, regexpCompileError := regexp.Compile(pattern)
 		if regexpCompileError != nil {
 			return nil, regexpCompileError
@@ -34,7 +36,9 @@ func NewConfiguration(name string, pattern string, allowMultiple bool) (*Extract
 	return &Extraction{
 		Name:    name,
 		Pattern: patternExpression,
-		Multi: allowMultiple,
+		Multi: false,
+		LeftTash: "{{",
+		RightTash: "}}",
 	},
 	nil
 }
@@ -53,7 +57,7 @@ func (extraction *Extraction) Execute(source []byte) ([]byte, string, error) {
 
 	match := found[0]
 
-	templateString := fmt.Sprintf("{{%s}}", extraction.Name)
+	templateString := extraction.placeholder()
 	templateBytes := []byte(templateString)
 
 	var password, out []byte
@@ -67,4 +71,8 @@ func (extraction *Extraction) Execute(source []byte) ([]byte, string, error) {
 	}
 
 	return out, string(password), nil
+}
+
+func (extraction *Extraction) placeholder() string {
+	return fmt.Sprintf("%s%s%s", extraction.LeftTash, extraction.Name, extraction.RightTash)
 }

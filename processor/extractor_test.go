@@ -27,7 +27,6 @@ var _ = Describe("NewConfiguration", func() {
 			configuration, err = NewConfiguration(
 				"anything",
 				"this(is(a(bad(regexp",
-				false,
 			)
 		})
 
@@ -41,8 +40,8 @@ var _ = Describe("NewConfiguration", func() {
 			configuration, err = NewConfiguration(
 				"anything",
 				"foo(.*)",
-				true,
 			)
+			configuration.Multi = true
 		})
 
 		Then("It is built correctly", func() {
@@ -67,20 +66,34 @@ var _ = Describe("Execute", func() {
 
 		When("I extract the password explicitly", func() {
 			BeforeEach(func() {
-				configuration, _ = NewConfiguration("password", "furryknuckleduster", false)
-				newState, credential, err = configuration.Execute(state)
+				configuration, _ = NewConfiguration("password", "furryknuckleduster")
 			})
 
 			Then("It extracts the password and tempaltizes it", func() {
+				newState, credential, err = configuration.Execute(state)
 				Expect(err).To(BeNil())
 				Expect(string(newState)).To(Equal("email: fred@example.com, password: {{password}}"))
 				Expect(credential).To(Equal("furryknuckleduster"))
+			})
+
+			When("I want the braces to be different", func() {
+				BeforeEach(func() {
+					configuration.LeftTash = "LLL"
+				  configuration.RightTash = "RRR"
+				})
+
+				Then("It extracts the password and tempaltizes it", func() {
+					newState, credential, err = configuration.Execute(state)
+					Expect(err).To(BeNil())
+					Expect(string(newState)).To(Equal("email: fred@example.com, password: LLLpasswordRRR"))
+					Expect(credential).To(Equal("furryknuckleduster"))
+				})
 			})
 		})
 
 		When("I extract the password with a singular matching regex", func() {
 			BeforeEach(func() {
-				configuration, _ = NewConfiguration("password", "furry.*duster", false)
+				configuration, _ = NewConfiguration("password", "furry.*duster")
 				newState, credential, err = configuration.Execute(state)
 			})
 
@@ -93,7 +106,7 @@ var _ = Describe("Execute", func() {
 
 		When("I extract the password with a capture group regex", func() {
 			BeforeEach(func() {
-				configuration, _ = NewConfiguration("password", "password: (.*)", false)
+				configuration, _ = NewConfiguration("password", "password: (.*)")
 				newState, credential, err = configuration.Execute(state)
 			})
 
@@ -106,7 +119,7 @@ var _ = Describe("Execute", func() {
 
 		When("I use a regex that does not match", func() {
 			BeforeEach(func() {
-				configuration, _ = NewConfiguration("password", "IDontMatch", false)
+				configuration, _ = NewConfiguration("password", "IDontMatch")
 				newState, credential, err = configuration.Execute(state)
 			})
 
@@ -128,33 +141,36 @@ var _ = Describe("Execute", func() {
 
 		When("I match more than once", func() {
 			BeforeEach(func() {
-				configuration, _ = NewConfiguration("password", "i-am-sensitive", false)
-				newState, credential, err = configuration.Execute(state)
+				configuration, _ = NewConfiguration("multi-pass", "i-am-sensitive")
 			})
 
 			Then("It returns a too many matches error", func() {
+				newState, credential, err = configuration.Execute(state)
 				Expect(err).To(MatchError(MultipleMatchError{Count: 2}))
 				Expect(newState).To(Equal(state))
 				Expect(credential).To(Equal(""))
 			})
-		})
 
-		When("I intentionally match more than once", func() {
-			BeforeEach(func() {
-				configuration, _ = NewConfiguration("multi-pass", "i-am-sensitive", true)
-				newState, credential, err = configuration.Execute(state)
+			When("I set multi to true", func() {
+				BeforeEach(func() {
+					configuration.Multi = true
+				})
+
+				Then("It templatizes all matches", func() {
+					newState, credential, err = configuration.Execute(state)
+
+					Expect(err).To(BeNil())
+					Expect(string(newState)).To(Equal(D(`
+						---
+						a-password: 1234ILikethings
+						fiddly-password: {{multi-pass}}
+						url: https://username:{{multi-pass}}@basic-auth.com
+					`)))
+					Expect(credential).To(Equal("i-am-sensitive"))
+				})
+
 			})
 
-			Then("It templatizes all matches", func() {
-				Expect(err).To(BeNil())
-				Expect(string(newState)).To(Equal(D(`
-					---
-					a-password: 1234ILikethings
-					fiddly-password: {{multi-pass}}
-					url: https://username:{{multi-pass}}@basic-auth.com
-				`)))
-				Expect(credential).To(Equal("i-am-sensitive"))
-			})
 		})
 
 	})
